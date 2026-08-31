@@ -1,0 +1,104 @@
+{
+  "train_attempts": 8928,
+  "test_attempts": 2247,
+  "students": 31,
+  "base_rate": 0.3373,
+  "ablation": [
+    {
+      "config": "full",
+      "auc": 0.5554,
+      "ece": 0.0782,
+      "root_cause_precision": 0.32,
+      "mean_blame_depth": 1.17,
+      "auc_delta": 0.0
+    },
+    {
+      "config": "no_confidence",
+      "auc": 0.5567,
+      "ece": 0.0693,
+      "root_cause_precision": 0.32,
+      "mean_blame_depth": 1.17,
+      "auc_delta": 0.0013
+    },
+    {
+      "config": "no_forgetting",
+      "auc": 0.5353,
+      "ece": 0.1962,
+      "root_cause_precision": 0.32,
+      "mean_blame_depth": 1.17,
+      "auc_delta": -0.0201
+    },
+    {
+      "config": "no_prereq_blame",
+      "auc": 0.5554,
+      "ece": 0.0782,
+      "root_cause_precision": 0.0,
+      "mean_blame_depth": 0.0,
+      "auc_delta": 0.0
+    }
+  ],
+  "calibration": [
+    {
+      "bin": "0.2-0.3",
+      "n": 301,
+      "predicted": 0.274,
+      "observed": 0.276
+    },
+    {
+      "bin": "0.3-0.4",
+      "n": 1105,
+      "predicted": 0.343,
+      "observed": 0.318
+    },
+    {
+      "bin": "0.4-0.5",
+      "n": 344,
+      "predicted": 0.447,
+      "observed": 0.331
+    },
+    {
+      "bin": "0.5-0.6",
+      "n": 216,
+      "predicted": 0.548,
+      "observed": 0.37
+    },
+    {
+      "bin": "0.6-0.7",
+      "n": 162,
+      "predicted": 0.648,
+      "observed": 0.426
+    },
+    {
+      "bin": "0.7-0.8",
+      "n": 77,
+      "predicted": 0.751,
+      "observed": 0.455
+    },
+    {
+      "bin": "0.8-0.9",
+      "n": 38,
+      "predicted": 0.842,
+      "observed": 0.579
+    }
+  ],
+  "recovery": {
+    "focus_half_life_min": {
+      "parameter": "focus half-life (min)",
+      "n": 30,
+      "true_mean": 23.43,
+      "fitted_mean": 7.32,
+      "bias": -16.11,
+      "mae": 16.11,
+      "correlation": 0.05
+    },
+    "retention_half_life_days": {
+      "parameter": "retention half-life (days)",
+      "n": 30,
+      "true_mean": 6.42,
+      "fitted_mean": 6.46,
+      "bias": 0.05,
+      "mae": 2.12,
+      "correlation": 0.049
+    }
+  }
+}

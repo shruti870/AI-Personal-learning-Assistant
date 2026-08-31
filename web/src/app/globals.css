@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Tailwind v4 uses CSS-first config. If create-next-app gave you Tailwind v3
+   instead (you'll have a tailwind.config.ts already), delete this @theme block
+   and use the tailwind.config.ts included alongside this file. */
+@theme {
+  --color-paper:     #F2F4F1;
+  --color-grid:      #DCE4DB;
+  --color-rule:      #C8D2C7;
+  --color-card:      #FBFBF8;
+  --color-ink:       #141A17;
+  --color-soft:      #4A554E;
+  --color-faint:     #7C877F;
+  --color-blueprint: #1B4D8F;
+  --color-amber:     #B8721A;
+  --color-alarm:     #9E2B2B;
+  --color-mastery:   #2E6B4F;
+
+  --color-alarm-wash: #F6E5E4;
+  --color-amber-wash: #F7EEDC;
+  --color-blue-wash:  #F4F7FB;
+
+  --font-display: var(--font-archivo), sans-serif;
+  --font-body:    var(--font-plex-sans), sans-serif;
+  --font-mono:    var(--font-plex-mono), monospace;
+}
+
+body {
+  background-color: var(--color-paper);
+  background-image:
+    linear-gradient(var(--color-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+.rule    { border-top: 1px solid var(--color-rule); }
+.eyebrow { letter-spacing: 0.18em; }
+.tight   { letter-spacing: -0.03em; }
+
+.trace-edge { stroke-dasharray: 200; stroke-dashoffset: 200; animation: draw .7s ease forwards; }
+.trace-node { opacity: 0; animation: pop .45s ease forwards; }
+
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.d1 { animation-delay: .15s }  .d2 { animation-delay: .55s }
+.d3 { animation-delay: .95s }  .d4 { animation-delay: 1.35s }
+.d5 { animation-delay: 1.75s } .d6 { animation-delay: 2.15s }
+
+.paper-card {
+  position: relative;
+  background: var(--color-card);
+  box-shadow:
+    0 1px 0 var(--color-rule),
+    0 2px 0 var(--color-card),
+    0 3px 0 var(--color-rule),
+    0 8px 14px -8px rgba(20, 26, 23, .28);
+}
+.paper-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--color-amber);
+}
+
+.layer { transition: transform .35s ease; }
+.stack:hover .l1 { transform: translate(-10px, -10px); }
+.stack:hover .l3 { transform: translate(10px, 10px); }
+
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--color-blueprint);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trace-edge, .trace-node { animation: none; stroke-dashoffset: 0; opacity: 1; }
+  .layer { transition: none; }
+}
+
+/* Scroll scene: the pinned section needs a scroll anchor that doesn't
+   fight the sticky header. */
+html { scroll-behavior: smooth; scroll-padding-top: 4rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
