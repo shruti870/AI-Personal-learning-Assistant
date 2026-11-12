@@ -1,21 +1,28 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { buildTutorPrompt, TUTOR_SYSTEM, type TutorContext } from '@/lib/tutor'
+import {
+  buildTutorPrompt,
+  explainRefusal,
+  TUTOR_SYSTEM,
+  TutorLimiter,
+  type TutorContext,
+} from '@/lib/tutor'
 import { type Embed, one } from '@/lib/supabase/embed'
 
 /**
  * AI tutor: explains the student's most recent WRONG answer to a question.
  *
  * Only explains an attempt the student actually made in the last 30 minutes,
- * so the route cannot be used as a general-purpose chatbot on our API key.
+ * once per attempt, and at most 20 times an hour per student, so the route
+ * cannot be used as a general-purpose chatbot on our API key.
  * The correct answer is read here on the server, after the attempt is
  * recorded, so nothing leaks before answering.
  */
 export const maxDuration = 60
 
 const MODEL = 'claude-opus-5-5'
-const WINDOW_MS = 30 * 60 * 1000
+const limiter = new TutorLimiter(20, 60 * 60 * 1000)
 
 type OptionRow = {
   option_id: string
@@ -38,7 +45,7 @@ export async function POST(request: Request) {
   const [{ data: attempt }, { data: question }] = await Promise.all([
     supabase
       .from('attempts')
-      .select('chosen_option_id, is_correct, created_at')
+      .select('attempt_id, chosen_option_id, is_correct, created_at')
       .eq('student_id', user.id)
       .eq('question_id', questionId)
       .order('created_at', { ascending: false })
@@ -56,14 +63,16 @@ export async function POST(request: Request) {
       .single(),
   ])
 
-  if (
-    !attempt ||
-    attempt.is_correct ||
-    Date.now() - new Date(attempt.created_at).getTime() > WINDOW_MS
-  ) {
+  const refusal = explainRefusal(attempt, Date.now())
+  if (refusal || !attempt) {
+    return NextResponse.json({ error: refusal }, { status: 400 })
+  }
+  const saved = limiter.cached(user.id, attempt.attempt_id)
+  if (saved) return NextResponse.json({ explanation: saved })
+  if (limiter.overLimit(user.id, Date.now())) {
     return NextResponse.json(
-      { error: 'The tutor explains a wrong answer you gave in the last 30 minutes.' },
-      { status: 400 }
+      { error: 'You have used the tutor a lot this hour. Try again later.' },
+      { status: 429 }
     )
   }
 
@@ -118,7 +127,7 @@ export async function POST(request: Request) {
     const client = new Anthropic()
     const response = await client.beta.messages.create({
       model: MODEL,
-      max_tokens: 4000,
+      max_tokens: 2000,
       // Short explanation: low effort keeps it quick and cheap.
       output_config: { effort: 'low' },
       // If the model declines, the API retries on a fallback model in the same call.
@@ -139,6 +148,7 @@ export async function POST(request: Request) {
       .join('\n')
       .trim()
     if (!text) return NextResponse.json({ error: 'Empty explanation.' }, { status: 502 })
+    limiter.record(user.id, attempt.attempt_id, text, Date.now())
     return NextResponse.json({ explanation: text })
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError) {

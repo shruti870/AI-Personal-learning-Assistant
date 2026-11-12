@@ -35,7 +35,7 @@ export function buildSubjects(input: {
       if (cs.length === 0) return null
       const mastery = cs.reduce((a, c) => a + (m.get(c.concept_id) ?? PRIOR), 0) / cs.length
       const raw = w.size
-        ? cs.reduce((a, c) => a + (w.get(c.concept_id) ?? 0), 0) / cs.length
+        ? cs.reduce((a, c) => a + (w.get(c.concept_id) ?? 1), 0) / cs.length // 1 = neutral, as in the planner
         : 1
       return {
         id: s.subject_id,

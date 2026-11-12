@@ -44,3 +44,51 @@ export function buildTutorPrompt(c: TutorContext): string {
   }
   return lines.join('\n')
 }
+
+/** How long after answering a wrong attempt can still be explained. */
+export const EXPLAIN_WINDOW_MS = 30 * 60 * 1000
+
+/** Why an attempt cannot be explained, or null when it can. */
+export function explainRefusal(
+  attempt: { is_correct: boolean; created_at: string } | null,
+  now: number
+): string | null {
+  if (!attempt || attempt.is_correct || now - Date.parse(attempt.created_at) > EXPLAIN_WINDOW_MS) {
+    return 'The tutor explains a wrong answer you gave in the last 30 minutes.'
+  }
+  return null
+}
+
+/**
+ * Bounds model calls: one explanation per attempt (repeats are served from
+ * memory) and a per-student cap over a sliding window. In-memory, so it is
+ * per server instance; enough for a single-instance deployment.
+ */
+export class TutorLimiter {
+  private explained = new Map<string, string>()
+  private calls = new Map<string, number[]>()
+
+  private readonly max: number
+  private readonly windowMs: number
+
+  // Plain fields, not parameter properties: node --test strips types only.
+  constructor(max: number, windowMs: number) {
+    this.max = max
+    this.windowMs = windowMs
+  }
+
+  cached(userId: string, attemptId: string): string | undefined {
+    return this.explained.get(`${userId}:${attemptId}`)
+  }
+
+  overLimit(userId: string, now: number): boolean {
+    const recent = (this.calls.get(userId) ?? []).filter((t) => now - t < this.windowMs)
+    this.calls.set(userId, recent)
+    return recent.length >= this.max
+  }
+
+  record(userId: string, attemptId: string, explanation: string, now: number): void {
+    this.explained.set(`${userId}:${attemptId}`, explanation)
+    this.calls.set(userId, [...(this.calls.get(userId) ?? []), now])
+  }
+}

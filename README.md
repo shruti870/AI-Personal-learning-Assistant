@@ -32,7 +32,7 @@ ml/   FastAPI + pandas/scipy/scikit-learn, reads and writes the same Postgres
 
 ## Setup
 
-You need Node 20+, Python 3.12, and a Supabase project.
+You need Node 22.18+ (or 23.6+; `npm test` runs TypeScript directly), Python 3.12, and a Supabase project.
 
 ### 1. Database
 
@@ -108,4 +108,5 @@ What this shows, honestly:
 
 - Students can read `options.is_correct` (the right answers) through the Supabase client, because the options table is readable by every signed-in user. Fixing it needs the server routes to use the service-role key.
 - C++ and Java run on the public Piston judge (`emkc.org`). Its availability is not guaranteed; Python runs in the browser and always works.
+- The AI tutor's limits (one explanation per wrong answer, 20 per student per hour) are kept in server memory, so they reset on restart and are per instance. Fine for a single-server demo; move them to a table before scaling out.
 - The question bank is small (132 questions over 64 concepts).

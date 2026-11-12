@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildTutorPrompt, TUTOR_SYSTEM } from './tutor.ts'
+import { buildTutorPrompt, explainRefusal, TUTOR_SYSTEM, TutorLimiter } from './tutor.ts'
 
 const base = {
   concept: 'Third normal form',
@@ -42,4 +42,31 @@ test('leaves the optional sections out when there is nothing to say', () => {
 test('the system prompt is fixed text, so it never varies between requests', () => {
   assert.equal(typeof TUTOR_SYSTEM, 'string')
   assert.doesNotMatch(TUTOR_SYSTEM, /\$\{/)
+})
+
+const NOW = Date.parse('2026-11-12T10:00:00Z')
+const minutesAgo = (m: number) => new Date(NOW - m * 60_000).toISOString()
+
+test('only a recent wrong attempt can be explained', () => {
+  assert.ok(explainRefusal(null, NOW))
+  assert.ok(explainRefusal({ is_correct: true, created_at: minutesAgo(1) }, NOW))
+  assert.ok(explainRefusal({ is_correct: false, created_at: minutesAgo(31) }, NOW))
+  assert.equal(explainRefusal({ is_correct: false, created_at: minutesAgo(29) }, NOW), null)
+})
+
+test('a repeat request for the same attempt gets the saved explanation', () => {
+  const l = new TutorLimiter(20, 60 * 60_000)
+  assert.equal(l.cached('u1', 'a1'), undefined)
+  l.record('u1', 'a1', 'because…', NOW)
+  assert.equal(l.cached('u1', 'a1'), 'because…')
+  assert.equal(l.cached('u2', 'a1'), undefined)
+})
+
+test('each student is capped per hour, and the window slides', () => {
+  const l = new TutorLimiter(2, 60 * 60_000)
+  l.record('u1', 'a1', 'x', NOW)
+  l.record('u1', 'a2', 'x', NOW)
+  assert.equal(l.overLimit('u1', NOW), true)
+  assert.equal(l.overLimit('u2', NOW), false)
+  assert.equal(l.overLimit('u1', NOW + 61 * 60_000), false)
 })
