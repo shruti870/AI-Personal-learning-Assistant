@@ -13,18 +13,36 @@ Run:
 
 from __future__ import annotations
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+import os
+import secrets
+
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from db import fetch
 from modules import attention, bkt, evaluate, features, forgetting, planner
 
-app = FastAPI(title="Diagnostic ML service", version="1.0.0")
+# Set ML_API_KEY wherever the service is reachable by anyone but you. The web
+# app sends it as X-API-Key from its server (never from the browser). Unset,
+# the service stays open, which is what local development wants.
+ML_API_KEY = os.environ.get("ML_API_KEY", "")
+
+
+def require_key(x_api_key: str = Header(default="")) -> None:
+    if ML_API_KEY and not secrets.compare_digest(x_api_key, ML_API_KEY):
+        raise HTTPException(401, "Missing or wrong X-API-Key.")
+
+
+app = FastAPI(
+    title="Diagnostic ML service", version="1.0.0",
+    dependencies=[Depends(require_key)],
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=os.environ.get(
+        "ALLOWED_ORIGINS", "http://localhost:3000").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -305,6 +305,7 @@ def build(data: dict, scored: pd.DataFrame) -> list[dict]:
             kind=r.kind,
             priority=round(float(r.priority), 4),
             reason=dict(
+                kind=r.kind,
                 effective_mastery=round(float(r.effective), 3),
                 raw_mastery=round(float(r.mastery), 3),
                 blame_share=round(float(r.blame), 3),
