@@ -68,6 +68,7 @@ export type Analytics = {
   medianObservations: number
   thinEstimate: boolean
   focusHalfLife: number | null
+  hasPlan: boolean
   sessionsTracked: number
   activeMinutes: number
   decayingCount: number | null
@@ -86,6 +87,8 @@ export async function getAnalytics(studentId: string): Promise<Analytics> {
     { data: mastery },
     { data: subjects },
     { data: sessions },
+    { data: attention },
+    { count: planCount },
   ] = await Promise.all([
     supabase
       .from('attempts')
@@ -110,6 +113,17 @@ export async function getAnalytics(studentId: string): Promise<Analytics> {
       .select('session_id, active_minutes, started_at')
       .eq('student_id', studentId)
       .not('active_minutes', 'is', null),
+    // Written by the ML service (modules/attention.py, modules/planner.py).
+    supabase
+      .from('attention_profile')
+      .select('focus_half_life_min')
+      .eq('student_id', studentId)
+      .maybeSingle(),
+    supabase
+      .from('study_plans')
+      .select('plan_id', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('is_current', true),
   ])
 
   const A = attempts ?? []
@@ -322,8 +336,12 @@ export async function getAnalytics(studentId: string): Promise<Analytics> {
     weakest,
     medianObservations,
     thinEstimate: medianObservations < 4,
-    // Needs the Python fitter and ~5 tracked sessions. Null until then.
-    focusHalfLife: null,
+    // Fitted by the ML service once there are enough tracked sessions.
+    focusHalfLife:
+      attention?.focus_half_life_min != null
+        ? Math.round(Number(attention.focus_half_life_min))
+        : null,
+    hasPlan: (planCount ?? 0) > 0,
     sessionsTracked: SESS.length,
     activeMinutes,
     decayingCount: null,

@@ -9,6 +9,7 @@ import FixFirstQueue from '@/components/dashboard/FixFirstQueue'
 import EmptyState from '@/components/dashboard/EmptyState'
 import MasteryBar from '@/components/dashboard/MasteryBar'
 import { getAnalytics } from '@/lib/analytics'
+import RecomputeButton from '@/components/dashboard/RecomputeButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -135,16 +136,21 @@ export default async function DashboardPage() {
           <FixFirstQueue items={a.fixFirst} />
           <MasteryBySubject subjects={a.subjects} />
 
-          <div className="border-l-2 border-blueprint bg-blue-wash px-5 py-4">
-            <p className="font-mono text-[10px] eyebrow text-blueprint mb-2">
-              NOT YET COMPUTED
-            </p>
-            <p className="text-xs text-soft leading-relaxed">
-              Forgetting curves, focus half-life, and the generated timetable need the
-              Python fitter and about five tracked sessions. Nothing here is
-              placeholder &mdash; those panels stay empty until the numbers are real.
-            </p>
-          </div>
+          {(!a.hasPlan || a.focusHalfLife === null) && (
+            <div className="border-l-2 border-blueprint bg-blue-wash px-5 py-4">
+              <p className="font-mono text-[10px] eyebrow text-blueprint mb-2">
+                NOT YET COMPUTED
+              </p>
+              <p className="text-xs text-soft leading-relaxed mb-4">
+                {!a.hasPlan && 'No weekly plan yet. '}
+                {a.focusHalfLife === null &&
+                  'Focus half-life needs about five tracked sessions. '}
+                The analysis service fits these from your own answers; nothing here is
+                placeholder.
+              </p>
+              <RecomputeButton />
+            </div>
+          )}
         </div>
       </div>
     </main>
