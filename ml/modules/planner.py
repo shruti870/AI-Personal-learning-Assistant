@@ -338,6 +338,11 @@ def write(student_id: str, items: list[dict]) -> str | None:
     # round trips per student adds up fast across a cohort.
     with connect() as conn, conn.cursor() as cur:
         cur.execute(
+            "select plan_id from study_plans where student_id = %s and is_current",
+            (student_id,),
+        )
+        previous = [str(r["plan_id"]) for r in cur.fetchall()]
+        cur.execute(
             "update study_plans set is_current = false where student_id = %s",
             (student_id,),
         )
@@ -357,6 +362,20 @@ def write(student_id: str, items: list[dict]) -> str | None:
                 for i in items
             ],
         )
+        # Keep this week's "done" marks: a block the student finished in the
+        # last 7 days stays done when the same concept appears in the new plan.
+        if previous:
+            cur.execute(
+                """update plan_items n
+                      set completed_at = o.done_at
+                     from (select concept_id, max(completed_at) as done_at
+                             from plan_items
+                            where plan_id = any(%s::uuid[])
+                              and completed_at > now() - interval '7 days'
+                            group by concept_id) o
+                    where n.plan_id = %s and n.concept_id = o.concept_id""",
+                (previous, plan_id),
+            )
         conn.commit()
 
     return plan_id
