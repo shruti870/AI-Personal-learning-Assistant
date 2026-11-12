@@ -4,12 +4,12 @@ import { useState } from 'react'
 
 /** "Explain this" for a wrong answer. Calls /api/explain on demand only. */
 export default function TutorExplain({ questionId }: { questionId: string }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [loading, setLoading] = useState(false)
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function ask() {
-    setState('loading')
+    setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/explain', {
@@ -20,18 +20,17 @@ export default function TutorExplain({ questionId }: { questionId: string }) {
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.explanation) {
         setError(data.error ?? `Failed (${res.status})`)
-        setState('idle')
         return
       }
       setText(data.explanation)
-      setState('done')
     } catch {
       setError('Could not reach the server.')
-      setState('idle')
+    } finally {
+      setLoading(false)
     }
   }
 
-  if (state === 'done' && text) {
+  if (text) {
     return (
       <div className="border-l-2 border-blueprint bg-blue-wash pl-4 pr-4 py-4 mt-5">
         <p className="font-mono text-[10px] eyebrow text-blueprint mb-2">AI TUTOR</p>
@@ -47,10 +46,10 @@ export default function TutorExplain({ questionId }: { questionId: string }) {
     <div className="mt-5">
       <button
         onClick={ask}
-        disabled={state === 'loading'}
+        disabled={loading}
         className="font-mono text-xs border border-blueprint text-blueprint px-4 py-2 hover:bg-blueprint hover:text-paper transition-colors disabled:opacity-50"
       >
-        {state === 'loading' ? 'Thinking…' : 'Explain my mistake (AI tutor)'}
+        {loading ? 'Thinking…' : 'Explain my mistake (AI tutor)'}
       </button>
       {error && <p className="font-mono text-[11px] text-alarm mt-2">{error}</p>}
     </div>

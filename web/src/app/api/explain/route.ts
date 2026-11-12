@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildTutorPrompt, TUTOR_SYSTEM, type TutorContext } from '@/lib/tutor'
+import { type Embed, one } from '@/lib/supabase/embed'
 
 /**
  * AI tutor: explains the student's most recent WRONG answer to a question.
@@ -21,11 +22,8 @@ type OptionRow = {
   body: string
   is_correct: boolean
   ordinal: number
-  misconceptions: { label: string; remediation_note: string | null } | { label: string; remediation_note: string | null }[] | null
+  misconceptions: Embed<{ label: string; remediation_note: string | null }>
 }
-
-const one = <T,>(v: T | T[] | null | undefined): T | null =>
-  Array.isArray(v) ? v[0] ?? null : v ?? null
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -37,14 +35,26 @@ export async function POST(request: Request) {
   const { questionId } = await request.json().catch(() => ({}))
   if (!questionId) return NextResponse.json({ error: 'Missing questionId' }, { status: 400 })
 
-  const { data: attempt } = await supabase
-    .from('attempts')
-    .select('chosen_option_id, is_correct, created_at')
-    .eq('student_id', user.id)
-    .eq('question_id', questionId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const [{ data: attempt }, { data: question }] = await Promise.all([
+    supabase
+      .from('attempts')
+      .select('chosen_option_id, is_correct, created_at')
+      .eq('student_id', user.id)
+      .eq('question_id', questionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('questions')
+      .select(`
+        stem, primary_concept_id,
+        concepts:primary_concept_id ( name ),
+        options ( option_id, body, is_correct, ordinal,
+          misconceptions:misconception_id ( label, remediation_note ) )
+      `)
+      .eq('question_id', questionId)
+      .single(),
+  ])
 
   if (
     !attempt ||
@@ -57,16 +67,6 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: question } = await supabase
-    .from('questions')
-    .select(`
-      stem, primary_concept_id,
-      concepts:primary_concept_id ( name ),
-      options ( option_id, body, is_correct, ordinal,
-        misconceptions:misconception_id ( label, remediation_note ) )
-    `)
-    .eq('question_id', questionId)
-    .single()
   if (!question) return NextResponse.json({ error: 'Unknown question' }, { status: 404 })
 
   const options = ((question.options ?? []) as unknown as OptionRow[]).sort(
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     if (weakest) {
       const p = parents.find((x) => x.parent_id === weakest.id)
       weakPrerequisite = {
-        name: one(p?.concepts as { name: string } | { name: string }[] | null)?.name ?? weakest.id,
+        name: one(p?.concepts as Embed<{ name: string }>)?.name ?? weakest.id,
         mastery: weakest.mastery,
       }
     }
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
   const prompt = buildTutorPrompt({
     concept:
-      one(question.concepts as { name: string } | { name: string }[] | null)?.name ??
+      one(question.concepts as Embed<{ name: string }>)?.name ??
       question.primary_concept_id,
     stem: question.stem,
     options: options.map((o) => ({

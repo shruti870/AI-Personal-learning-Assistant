@@ -5,6 +5,7 @@ import PageHead from '@/components/dashboard/PageHead'
 import { getAnalytics } from '@/lib/analytics'
 import RecomputeButton from '@/components/dashboard/RecomputeButton'
 import PlanItemToggle from '@/components/dashboard/PlanItemToggle'
+import { type Embed, one } from '@/lib/supabase/embed'
 
 type Reason = {
   kind?: string
@@ -25,7 +26,7 @@ type Item = {
   allocated_minutes: number
   completed_at: string | null
   reason: Reason | null
-  concepts: { name: string; subject_id: string } | { name: string; subject_id: string }[] | null
+  concepts: Embed<{ name: string; subject_id: string }>
 }
 
 /** One plain sentence from the planner's numbers. */
@@ -141,7 +142,7 @@ export default async function PlanPage() {
               {items
                 .filter((it) => it.scheduled_for === d)
                 .map((it) => {
-                  const c = Array.isArray(it.concepts) ? it.concepts[0] : it.concepts
+                  const c = one(it.concepts)
                   const reason = why(it.reason)
                   return (
                     <div key={it.plan_item_id} className="paper-card pl-7 pr-5 py-4">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   type SimSubject,
   bestNextHour,
@@ -22,7 +22,7 @@ export default function Simulator({
   budget: number
   examName: string | null
 }) {
-  const BASELINE = readiness(subjects, {})
+  const baseline = useMemo(() => readiness(subjects, {}), [subjects])
   const [alloc, setAlloc] = useState<Record<string, number>>(() =>
     initialAllocation(subjects, budget)
   )
@@ -30,7 +30,7 @@ export default function Simulator({
   const used = Object.values(alloc).reduce((a, b) => a + b, 0)
   const left = budget - used
   const projected = readiness(subjects, alloc)
-  const delta = projected - BASELINE
+  const delta = projected - baseline
 
   function set(id: string, v: number) {
     const others = used - (alloc[id] ?? 0)
@@ -117,18 +117,18 @@ export default function Simulator({
               {projected.toFixed(0)}
             </span>
             <span className="font-mono text-sm text-amber">
-              +{delta.toFixed(1)} from {BASELINE.toFixed(0)}
+              +{delta.toFixed(1)} from {baseline.toFixed(0)}
             </span>
           </div>
           <div className="h-2 bg-paper/10 mt-6 relative">
             <div
               className="bg-paper/30"
-              style={{ width: `${BASELINE}%`, position: 'absolute', inset: '0 auto 0 0' }}
+              style={{ width: `${baseline}%`, position: 'absolute', inset: '0 auto 0 0' }}
             />
             <div
               className="bg-amber"
               style={{
-                left: `${BASELINE}%`,
+                left: `${baseline}%`,
                 width: `${delta}%`,
                 position: 'absolute',
                 top: 0,

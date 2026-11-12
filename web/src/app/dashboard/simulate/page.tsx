@@ -4,6 +4,7 @@ import PageHead from '@/components/dashboard/PageHead'
 import Simulator from '@/components/dashboard/Simulator'
 import EmptyState from '@/components/dashboard/EmptyState'
 import { buildSubjects } from '@/lib/simulator'
+import { type Embed, one } from '@/lib/supabase/embed'
 
 export default async function SimulatePage() {
   const supabase = await createClient()
@@ -47,8 +48,7 @@ export default async function SimulatePage() {
     )
   }
 
-  const exam = profile?.exam_profiles as unknown as { name: string } | { name: string }[] | null
-  const examName = (Array.isArray(exam) ? exam[0]?.name : exam?.name) ?? null
+  const examName = one(profile?.exam_profiles as Embed<{ name: string }>)?.name ?? null
   const budget = Math.max(1, Math.round((profile?.weekly_minutes ?? 300) / 60))
 
   return (

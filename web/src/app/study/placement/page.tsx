@@ -1,25 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import PlacementRunner from '@/components/study/PlacementRunner'
+import { type Embed, one } from '@/lib/supabase/embed'
 
-// Without generated database types, supabase-js types a to-one embed as an
-// array even though PostgREST returns a single object at runtime. Accept both.
-type ConceptRef = { subject_id: string }
 type PoolItem = {
   difficulty: number
-  concepts: ConceptRef | ConceptRef[] | null
-}
-
-function subjectOf(q: PoolItem): string {
-  const c = Array.isArray(q.concepts) ? q.concepts[0] : q.concepts
-  return c?.subject_id ?? 'unknown'
+  concepts: Embed<{ subject_id: string }>
 }
 
 /** Even coverage across subjects, then across easy/medium/hard within each. */
 function stratifiedSample<T extends PoolItem>(pool: T[], want: number): T[] {
   const bySubject = new Map<string, T[]>()
   for (const q of pool) {
-    const key = subjectOf(q)
+    const key = one(q.concepts)?.subject_id ?? 'unknown'
     const list = bySubject.get(key) ?? []
     list.push(q)
     bySubject.set(key, list)
