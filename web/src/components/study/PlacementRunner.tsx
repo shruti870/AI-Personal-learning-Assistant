@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useStudySession } from '@/hooks/useStudySession'
+import TutorExplain from '@/components/study/TutorExplain'
 
 type Opt = { option_id: string; body: string; ordinal: number }
 type Q = {
@@ -302,6 +303,10 @@ export default function PlacementRunner({
                   {result.misconception.remediation_note}
                 </p>
               </div>
+            )}
+
+            {!result.isCorrect && (
+              <TutorExplain key={q.question_id} questionId={q.question_id} />
             )}
 
             <button
