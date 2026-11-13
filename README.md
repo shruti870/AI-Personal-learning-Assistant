@@ -107,7 +107,6 @@ What this shows, honestly:
 
 ## Known limitations
 
-- A student can still insert attempt rows directly through the Supabase client (the `attempts` policy allows it), which would inflate their own mastery. It only affects that student's own numbers.
 - Hidden test cases for coding problems are sent to the browser, because Python runs there (so it works offline). A determined student can read them.
 - C++ and Java run on the public Piston judge (`emkc.org`). Its availability is not guaranteed; Python runs in the browser and always works.
 - The AI tutor's limits (one explanation per wrong answer, 20 per student per hour) are kept in server memory, so they reset on restart and are per instance. Fine for a single-server demo; move them to a table before scaling out.

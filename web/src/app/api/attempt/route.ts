@@ -8,8 +8,8 @@ import { NextResponse } from 'next/server'
  * The Postgres trigger on `attempts` then updates mastery automatically.
  *
  * Students cannot read is_correct or misconception_id (migration 009), so
- * the answer key is read with the service-role client. The attempt itself
- * is still written with the student's own client, under RLS.
+ * the answer key is read, and the graded attempt written, with the
+ * service-role client. student_id always comes from the signed-in session.
  */
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -67,7 +67,9 @@ export async function POST(request: Request) {
     errorType = 'procedural_slip'
   }
 
-  const { error } = await supabase.from('attempts').insert({
+  // Written with the service-role client: students can no longer insert
+  // attempts themselves (009). student_id always comes from the session.
+  const { error } = await admin.from('attempts').insert({
     student_id: user.id,
     question_id: questionId,
     chosen_option_id: optionId,
