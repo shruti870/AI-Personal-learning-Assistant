@@ -13,18 +13,36 @@ Run:
 
 from __future__ import annotations
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+import os
+import secrets
+
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from db import fetch
 from modules import attention, bkt, evaluate, features, forgetting, planner
 
-app = FastAPI(title="Diagnostic ML service", version="1.0.0")
+# Set ML_API_KEY wherever the service is reachable by anyone but you. The web
+# app sends it as X-API-Key from its server (never from the browser). Unset,
+# the service stays open, which is what local development wants.
+ML_API_KEY = os.environ.get("ML_API_KEY", "")
+
+
+def require_key(x_api_key: str = Header(default="")) -> None:
+    if ML_API_KEY and not secrets.compare_digest(x_api_key, ML_API_KEY):
+        raise HTTPException(401, "Missing or wrong X-API-Key.")
+
+
+app = FastAPI(
+    title="Diagnostic ML service", version="1.0.0",
+    dependencies=[Depends(require_key)],
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[o.strip() for o in os.environ.get(
+        "ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -86,6 +104,11 @@ def hourly(student_id: str):
 
 # ----------------------------------------------------------------- pipeline
 
+def _without_mastery(df):
+    have = {str(r["student_id"]) for r in fetch("select distinct student_id from mastery")}
+    return df[~df["student_id"].astype(str).isin(have)]
+
+
 def _recompute(student_id: str | None) -> dict:
     """The full pipeline, in dependency order. bkt first: everything else
     reads the mastery rows it writes."""
@@ -93,7 +116,12 @@ def _recompute(student_id: str | None) -> dict:
     if df.empty:
         return {"status": "no_attempts"}
 
-    steps = {"mastery_rows": bkt.materialize(df)}
+    # Real students' mastery is kept by the Postgres trigger on every answer,
+    # with per-concept bkt_params and question weights. bkt.forward uses fixed
+    # global parameters, so replaying it over those rows would silently shift
+    # the numbers a student sees. Only rebuild students with no mastery rows
+    # (a freshly generated synthetic cohort, loaded with the trigger off).
+    steps = {"mastery_rows": bkt.materialize(_without_mastery(df))}
 
     fits = attention.fit_all(student_id)
     steps["attention_profiles"] = attention.write(fits) if not fits.empty else 0

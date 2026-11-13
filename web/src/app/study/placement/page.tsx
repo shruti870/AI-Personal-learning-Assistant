@@ -1,17 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import PlacementRunner from '@/components/study/PlacementRunner'
+import { type Embed, one } from '@/lib/supabase/embed'
 
 type PoolItem = {
   difficulty: number
-  concepts: { subject_id: string } | null
+  concepts: Embed<{ subject_id: string }>
 }
 
 /** Even coverage across subjects, then across easy/medium/hard within each. */
 function stratifiedSample<T extends PoolItem>(pool: T[], want: number): T[] {
   const bySubject = new Map<string, T[]>()
   for (const q of pool) {
-    const key = q.concepts?.subject_id ?? 'unknown'
+    const key = one(q.concepts)?.subject_id ?? 'unknown'
     const list = bySubject.get(key) ?? []
     list.push(q)
     bySubject.set(key, list)
