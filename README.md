@@ -36,7 +36,7 @@ You need Node 22.18+ (or 23.6+; `npm test` runs TypeScript directly), Python 3.1
 
 ### 1. Database
 
-In the Supabase SQL editor, run every file in `supabase/migrations/` in order (`001` to `008`). They are safe to re-run.
+In the Supabase SQL editor, run every file in `supabase/migrations/` in order (`001` to `009`). They are safe to re-run. `009` hides the answer key from students, so set `SUPABASE_SERVICE_ROLE_KEY` (below) before using the app after running it.
 
 ### 2. Web app
 
@@ -50,6 +50,7 @@ npm run dev                     # http://localhost:3000
 | Variable | What it is |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase -> Project Settings -> API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Same page, the `service_role` key. Server-only: used to grade answers, since students cannot read the answer key. Never prefix it with `NEXT_PUBLIC_` |
 | `ML_URL` | Where the ML service runs (default `http://localhost:8000`) |
 | `ML_API_KEY` | Shared secret with the ML service; empty is fine locally |
 | `ANTHROPIC_API_KEY` | For the AI tutor; without it the button says it is not set up |
@@ -106,7 +107,8 @@ What this shows, honestly:
 
 ## Known limitations
 
-- Students can read `options.is_correct` (the right answers) through the Supabase client, because the options table is readable by every signed-in user. Fixing it needs the server routes to use the service-role key.
+- A student can still insert attempt rows directly through the Supabase client (the `attempts` policy allows it), which would inflate their own mastery. It only affects that student's own numbers.
+- Hidden test cases for coding problems are sent to the browser, because Python runs there (so it works offline). A determined student can read them.
 - C++ and Java run on the public Piston judge (`emkc.org`). Its availability is not guaranteed; Python runs in the browser and always works.
 - The AI tutor's limits (one explanation per wrong answer, 20 per student per hour) are kept in server memory, so they reset on restart and are per instance. Fine for a single-server demo; move them to a table before scaling out.
 - The question bank is small (132 questions over 64 concepts).

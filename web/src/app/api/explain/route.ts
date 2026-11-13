@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildTutorPrompt,
   explainRefusal,
@@ -42,6 +43,14 @@ export async function POST(request: Request) {
   const { questionId } = await request.json().catch(() => ({}))
   if (!questionId) return NextResponse.json({ error: 'Missing questionId' }, { status: 400 })
 
+  // The answer key (is_correct, misconception_id) is service-role only.
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+
   const [{ data: attempt }, { data: question }] = await Promise.all([
     supabase
       .from('attempts')
@@ -51,7 +60,7 @@ export async function POST(request: Request) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
+    admin
       .from('questions')
       .select(`
         stem, primary_concept_id,

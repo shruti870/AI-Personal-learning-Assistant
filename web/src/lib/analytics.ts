@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { type Embed, one } from '@/lib/supabase/embed'
 
 /**
  * Real analytics computed from the student's own rows.
@@ -93,10 +95,8 @@ export async function getAnalytics(studentId: string): Promise<Analytics> {
     supabase
       .from('attempts')
       .select(`
-        attempt_id, is_correct, confidence, error_type, created_at,
-        questions:question_id ( primary_concept_id ),
-        options:chosen_option_id ( misconception_id,
-          misconceptions:misconception_id ( label, concept_id ) )
+        attempt_id, is_correct, confidence, error_type, created_at, chosen_option_id,
+        questions:question_id ( primary_concept_id )
       `)
       .eq('student_id', studentId)
       .order('created_at', { ascending: false })
@@ -252,13 +252,29 @@ export async function getAnalytics(studentId: string): Promise<Analytics> {
   }
 
   // ---------- Fix-first queue, from named misconceptions ----------
+  // Which option carries which misconception is part of the answer key, so it
+  // is looked up server-side for the options this student actually chose.
+  const wrongChoices = [
+    ...new Set(A.filter((a) => !a.is_correct && a.chosen_option_id).map((a) => a.chosen_option_id)),
+  ]
+  const beliefOf = new Map<string, { label: string; concept_id: string }>()
+  if (wrongChoices.length && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // Without the key, grading already fails loudly in /api/attempt; here the
+    // dashboard just shows no named beliefs rather than failing to render.
+    const { data: tagged } = await createAdminClient()
+      .from('options')
+      .select('option_id, misconceptions:misconception_id ( label, concept_id )')
+      .in('option_id', wrongChoices)
+      .not('misconception_id', 'is', null)
+    for (const o of tagged ?? []) {
+      const m = one(o.misconceptions as Embed<{ label: string; concept_id: string }>)
+      if (m) beliefOf.set(o.option_id, m)
+    }
+  }
   const beliefs = new Map<string, { label: string; conceptId: string; n: number }>()
   for (const a of A) {
-    if (a.is_correct) continue
-    const opt = a.options as unknown as {
-      misconceptions: { label: string; concept_id: string } | null
-    } | null
-    const m = opt?.misconceptions
+    if (a.is_correct || !a.chosen_option_id) continue
+    const m = beliefOf.get(a.chosen_option_id)
     if (!m) continue
     const key = m.label
     const prev = beliefs.get(key)
