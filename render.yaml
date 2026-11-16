@@ -1,0 +1,19 @@
+# Render Blueprint for the ML service (ml/). The web app goes on Vercel.
+# Render > New > Blueprint > pick this repo; it asks for the secrets below.
+services:
+  - type: web
+    name: learning-assistant-ml
+    runtime: python
+    plan: free            # sleeps after 15 idle minutes; first request then takes ~1 minute
+    rootDir: ml
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"   # the pinned pandas/scipy wheels exist for 3.12
+      - key: DATABASE_URL
+        sync: false       # Supabase SESSION POOLER string (Render has no IPv6, the direct one fails)
+      - key: ML_API_KEY
+        sync: false       # same value as ML_API_KEY on Vercel
+      - key: ALLOWED_ORIGINS
+        sync: false       # your Vercel URL, e.g. https://your-app.vercel.app

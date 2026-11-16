@@ -86,6 +86,33 @@ cd ml  && pip install -r requirements-dev.txt && pytest
 
 To have data for every panel without studying for a week, generate a synthetic cohort first: `python synth.py --students 30 --days 21` in `ml/`, then `curl -X POST localhost:8000/recompute-all`. See `ml/README.md`.
 
+### A demo account with three weeks of history
+
+A new account has nothing to show until it has studied for days. For a demo, give one account a synthetic history:
+
+1. Sign up in the web app with the demo email (for example `judges@yourteam.dev`).
+2. In `ml/`: `python synth.py --students 30 --days 21 --demo-email judges@yourteam.dev`
+3. Log in as that account and press **Refresh analysis** (or `curl -X POST <ML_URL>/recompute-all -H "X-API-Key: ..."`).
+
+Every panel now has data, and live questions still work on top. `python synth.py --clean` removes the 29 synthetic students but not the demo account; delete that under Supabase > Authentication > Users when you are done.
+
+## Deploying
+
+The web app goes on Vercel, the ML service on Render, the database stays on Supabase. All three have free plans.
+
+1. **Supabase**
+   - Run migrations 001-009 if not done.
+   - Authentication > URL Configuration: set Site URL to the Vercel URL and add `https://<your-app>.vercel.app/**` to Redirect URLs.
+   - The built-in email sender only delivers to members of your Supabase team, about 2 emails an hour. So that anyone else can sign up, turn off **Confirm email** (Authentication > Sign In / Providers > Email) or add custom SMTP.
+   - Free projects pause after a week without activity. Open the project a day before any demo.
+2. **Render (ML service)**: New > Blueprint > this repo. `render.yaml` sets it up. Fill in:
+   - `DATABASE_URL`: the **Session pooler** string (Supabase > Connect). The direct string fails because Render has no IPv6.
+   - `ML_API_KEY`: a long random value.
+   - `ALLOWED_ORIGINS`: the Vercel URL.
+3. **Vercel (web app)**: Add New > Project > this repo, Root Directory `web`. Set the environment variables from `web/.env.example`. `ML_URL` is the Render URL, and `ML_API_KEY` is the same value as on Render. Then add the Vercel URL to Render's `ALLOWED_ORIGINS` and Supabase's URL settings.
+
+The free Render service sleeps after 15 idle minutes, and the first request then takes about a minute. Open `<ML_URL>/docs` a few minutes before presenting to wake it.
+
 ## Results (synthetic cohort, `docs/evaluation.json`)
 
 31 students, 8,928 training and 2,247 test attempts.
