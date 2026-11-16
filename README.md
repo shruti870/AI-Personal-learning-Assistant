@@ -12,7 +12,7 @@ A study assistant for campus placement preparation (aptitude, reasoning, DSA, DB
 | Knowledge tracing (mastery per concept) | Postgres trigger + `ml/modules/bkt.py` | Bayesian Knowledge Tracing, confidence-adjusted |
 | Root-cause diagnosis | `/dashboard`, `/dashboard/diagnosis` | Blame propagated down the prerequisite graph |
 | Named misconceptions | Answer feedback | Wrong options are tagged with the belief behind them |
-| AI tutor | "Explain my mistake" after a wrong answer | Claude explains the error, using the misconception and weakest prerequisite |
+| AI tutor | "Explain my mistake" after a wrong answer | An LLM (Groq free tier, or Claude) explains the error, using the misconception and weakest prerequisite |
 | Focus half-life | `ml/modules/attention.py` | Accuracy decay within a session, from tab/idle tracking (opt-in) |
 | Forgetting curve | `ml/modules/forgetting.py` | Per-student retention half-life, fitted by maximum likelihood |
 | Weekly plan | `/dashboard/plan` | Priority = room to gain x blame x exam weight x urgency x readiness |
@@ -25,7 +25,7 @@ A study assistant for campus placement preparation (aptitude, reasoning, DSA, DB
 web/  Next.js 16 + Supabase auth ──► Supabase Postgres (supabase/migrations)
           │  /api/attempt   grade an answer, trigger updates mastery
           │  /api/recompute ──► ml/ FastAPI: refit mastery, focus, forgetting, plan
-          │  /api/explain   ──► Claude API (AI tutor)
+          │  /api/explain   ──► Groq or Claude API (AI tutor)
           │  /api/run       ──► public code judge (C++/Java)
 ml/   FastAPI + pandas/scipy/scikit-learn, reads and writes the same Postgres
 ```
@@ -53,7 +53,8 @@ npm run dev                     # http://localhost:3000
 | `SUPABASE_SERVICE_ROLE_KEY` | Same page, the `service_role` key. Server-only: used to grade answers, since students cannot read the answer key. Never prefix it with `NEXT_PUBLIC_` |
 | `ML_URL` | Where the ML service runs (default `http://localhost:8000`) |
 | `ML_API_KEY` | Shared secret with the ML service; empty is fine locally |
-| `ANTHROPIC_API_KEY` | For the AI tutor; without it the button says it is not set up |
+| `GROQ_API_KEY` | AI tutor on Groq's free tier (model `openai/gpt-oss-120b`, change with `GROQ_MODEL`). Used when set |
+| `ANTHROPIC_API_KEY` | AI tutor on Claude instead, used only when `GROQ_API_KEY` is empty. With neither, the button says the tutor is not set up |
 
 ### 3. ML service
 
