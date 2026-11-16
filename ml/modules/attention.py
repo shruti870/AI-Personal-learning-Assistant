@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
-from db import executemany
+from db import executemany, fetch
 from modules import features
 
 # Below these, a fit is noise. Reporting a tau from three attempts would be
@@ -142,6 +142,21 @@ def fatigue_slope(df: pd.DataFrame) -> float | None:
     return float(np.polyfit(x, y, 1)[0])
 
 
+def stored_median_tau(exclude: str | None) -> float | None:
+    """Cohort median from profiles already written. A one-student refresh
+    has no cohort in hand, so without this a student whose own curve does
+    not fit would get no profile at all."""
+    r = fetch(
+        """select percentile_cont(0.5) within group (order by focus_half_life_min) as med,
+                  count(*) as n
+             from attention_profile
+            where focus_half_life_min is not null
+              and student_id is distinct from %s::uuid""",
+        (exclude,),
+    )
+    return float(r[0]["med"]) if r and r[0]["n"] >= 3 else None
+
+
 def fit_all(student_id: str | None = None) -> pd.DataFrame:
     df = features.attempts_frame(student_id)
     if df.empty:
@@ -198,8 +213,8 @@ def fit_all(student_id: str | None = None) -> pd.DataFrame:
     # cohort median rather than a hard-coded 25. Recorded as "pooled" so the
     # report can state how many students were individually fitted.
     good = fits[fits["status"] == "fitted"]
-    if len(good) >= 3:
-        median_tau = float(good["tau"].median())
+    median_tau = float(good["tau"].median()) if len(good) >= 3 else stored_median_tau(student_id)
+    if median_tau is not None:
         mask = fits["status"].isin(["fit_failed", "insufficient_data"])
         fits.loc[mask, "tau"] = median_tau
         fits.loc[mask, "block_min"] = int(np.clip(round(median_tau), 15, 50))
