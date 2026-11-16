@@ -1,10 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 /**
  * Grading runs server-side because the browser must never see is_correct
  * before answering. The client sends what it chose; the server decides.
  * The Postgres trigger on `attempts` then updates mastery automatically.
+ *
+ * Students cannot read is_correct or misconception_id (migration 009), so
+ * the answer key is read, and the graded attempt written, with the
+ * service-role client. student_id always comes from the signed-in session.
  */
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -23,7 +28,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  const { data: option } = await supabase
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+
+  const { data: option } = await admin
     .from('options')
     .select('option_id, question_id, is_correct, misconception_id')
     .eq('option_id', optionId)
@@ -55,7 +67,9 @@ export async function POST(request: Request) {
     errorType = 'procedural_slip'
   }
 
-  const { error } = await supabase.from('attempts').insert({
+  // Written with the service-role client: students can no longer insert
+  // attempts themselves (009). student_id always comes from the session.
+  const { error } = await admin.from('attempts').insert({
     student_id: user.id,
     question_id: questionId,
     chosen_option_id: optionId,
@@ -73,7 +87,7 @@ export async function POST(request: Request) {
 
   let misconception = null
   if (option.misconception_id) {
-    const { data: m } = await supabase
+    const { data: m } = await admin
       .from('misconceptions')
       .select('label, remediation_note')
       .eq('misconception_id', option.misconception_id)
@@ -81,7 +95,7 @@ export async function POST(request: Request) {
     misconception = m
   }
 
-  const { data: correctOption } = await supabase
+  const { data: correctOption } = await admin
     .from('options')
     .select('body')
     .eq('question_id', questionId)
