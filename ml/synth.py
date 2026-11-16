@@ -26,6 +26,12 @@ Usage
   python synth.py --students 30 --days 21          generate and insert
   python synth.py --students 30 --days 21 --dry    print summary only
   python synth.py --clean                          remove synthetic rows
+
+  python synth.py --students 30 --days 21 --demo-email judge@example.com
+      Same, but the first student's history goes into an account that was
+      already signed up through the web app, so it can log in and show every
+      panel. --clean does not touch that account; delete it under Supabase >
+      Authentication > Users when the demo is over (everything it owns cascades).
 """
 
 from __future__ import annotations
@@ -271,7 +277,16 @@ def typing_window(student: Student, minutes_in: float, rng: random.Random) -> di
     )
 
 
-def generate(n_students: int, days: int, seed: int, dry: bool):
+def demo_account_id(email: str) -> str:
+    rows = fetch("select id from auth.users where lower(email) = lower(%s)", (email,))
+    if not rows:
+        raise SystemExit(
+            f"No account for {email}. Sign up with it in the web app first, then re-run."
+        )
+    return str(rows[0]["id"])
+
+
+def generate(n_students: int, days: int, seed: int, dry: bool, demo_email: str | None = None):
     rng = random.Random(seed)
     concepts, prereqs, questions, options_by_q = load_content()
 
@@ -287,6 +302,11 @@ def generate(n_students: int, days: int, seed: int, dry: bool):
 
     students = make_students(n_students, concepts, rng)
     seed_beliefs(students, questions, options_by_q, rng)
+    demo_id = None
+    if demo_email:
+        demo_id = demo_account_id(demo_email)
+        students[0].student_id = demo_id  # its auth row exists, so insert skips it
+        print(f"demo account    {demo_email} gets {students[0].name}'s history")
 
     initial = {s.student_id: dict(s.true_mastery) for s in students}
 
@@ -298,7 +318,7 @@ def generate(n_students: int, days: int, seed: int, dry: bool):
             (
                 s.student_id,
                 s.name,
-                SYNTH_COHORT,
+                None if s.student_id == demo_id else SYNTH_COHORT,
                 int(rng.choice([180, 240, 300, 420])),
                 True,
             )
@@ -551,9 +571,10 @@ if __name__ == "__main__":
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--dry", action="store_true", help="summarise without writing")
     ap.add_argument("--clean", action="store_true", help="delete the synthetic cohort")
+    ap.add_argument("--demo-email", help="also fill this signed-up account with history")
     a = ap.parse_args()
 
     if a.clean:
         clean()
     else:
-        generate(a.students, a.days, a.seed, a.dry)
+        generate(a.students, a.days, a.seed, a.dry, a.demo_email)
