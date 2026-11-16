@@ -10,6 +10,7 @@ import {
   type TutorContext,
 } from '@/lib/tutor'
 import { type Embed, one } from '@/lib/supabase/embed'
+import { explainWithGroq } from '@/lib/groq'
 
 /**
  * AI tutor: explains the student's most recent WRONG answer to a question.
@@ -132,6 +133,15 @@ export async function POST(request: Request) {
     weakPrerequisite,
   })
 
+  // Free option: Groq, when its key is set. Otherwise Claude below.
+  const groqKey = process.env.GROQ_API_KEY
+  if (groqKey) {
+    const r = await explainWithGroq(TUTOR_SYSTEM, prompt, groqKey, process.env.GROQ_MODEL || undefined)
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
+    limiter.record(user.id, attempt.attempt_id, r.text, Date.now())
+    return NextResponse.json({ explanation: r.text })
+  }
+
   try {
     const client = new Anthropic()
     const response = await client.beta.messages.create({
@@ -177,7 +187,7 @@ export async function POST(request: Request) {
     }
     // The SDK throws a plain Error when it finds no credentials at all.
     return NextResponse.json(
-      { error: 'The AI tutor is unavailable. Is ANTHROPIC_API_KEY set in web/.env.local?' },
+      { error: 'The AI tutor is unavailable. Set GROQ_API_KEY or ANTHROPIC_API_KEY in web/.env.local.' },
       { status: 503 }
     )
   }
